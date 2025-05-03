@@ -23,6 +23,7 @@ const CandleChart: React.FC = () => {
   const [animatingCandle, setAnimatingCandle] = useState<number | null>(null);
   const [showTradePlaced, setShowTradePlaced] = useState(false);
   const [roundFinished, setRoundFinished] = useState(false); 
+  const [tradePlacedPrice, setTradePlacedPrice] = useState<number | null>(null);
   const animationRef = useRef<number | null>(null);
   
   // Generate data for different rounds
@@ -46,9 +47,10 @@ const CandleChart: React.FC = () => {
     setVisibleCandles(24);
     setAnimatingCandle(null);
     setRoundFinished(false);
+    setTradePlacedPrice(null);
     
     // Generate new data for this round
-    const data = generateCandleData(50, startingPrices[currentRound as keyof typeof startingPrices]);
+    const data = generateCandleData(34, startingPrices[currentRound as keyof typeof startingPrices]);
     setCandleData(data);
     
     // Start animating the final candle after a delay
@@ -110,6 +112,9 @@ const CandleChart: React.FC = () => {
               animationRef.current = null;
             }
             
+            // Store the trade placed price
+            setTradePlacedPrice(target.close);
+            
             // Show "Trade Placed" annotation after candle completes
             setTimeout(() => {
               setShowTradePlaced(true);
@@ -145,7 +150,7 @@ const CandleChart: React.FC = () => {
   const revealRemainingCandles = () => {
     let currentVisible = 24;
     const interval = setInterval(() => {
-      if (currentVisible < candleData.length) {
+      if (currentVisible < 34 && currentVisible < 24 + 10) { // Limit to 10 additional candles
         currentVisible++;
         setVisibleCandles(currentVisible);
       } else {
@@ -211,7 +216,7 @@ const CandleChart: React.FC = () => {
     const candleHeight = Math.max(2, candleBottom - candleTop);
     
     const x = 40 + index * 25;
-    const isNewCandle = index >= 24 && !isAnimating;
+    const isNewCandle = index >= 24;
     
     return (
       <g 
@@ -408,6 +413,32 @@ const CandleChart: React.FC = () => {
             </g>
           ))}
           
+          {/* Trade placed horizontal line */}
+          {tradePlacedPrice && (
+            <g className="animate-fadeIn" style={{ animationDelay: '0.5s' }}>
+              <line 
+                x1="40" 
+                y1={priceToY(tradePlacedPrice)} 
+                x2="100%" 
+                y2={priceToY(tradePlacedPrice)} 
+                stroke="#4fd1c5" 
+                strokeWidth="1"
+                strokeDasharray="5,5"
+              />
+              <text 
+                x="100%" 
+                y={priceToY(tradePlacedPrice) - 5}
+                textAnchor="end"
+                fill="#4fd1c5"
+                fontSize="12"
+                fontWeight="bold"
+                dx="-10"
+              >
+                Trade at {tradePlacedPrice.toFixed(2)}
+              </text>
+            </g>
+          )}
+          
           {/* Volume Y-axis */}
           <line x1="40" y1="540" x2="100%" y2="540" stroke="#232838" strokeWidth="0.5" />
           
@@ -445,8 +476,8 @@ const CandleChart: React.FC = () => {
       
       <div className="mt-4 flex items-center justify-between text-sm text-gray-400">
         <div>Volume: {volumeMax.toLocaleString()}</div>
-        {visibleCandles < candleData.length ? (
-          <div>Loading {candleData.length - visibleCandles} more candles...</div>
+        {visibleCandles < 34 ? (
+          <div>Loading {Math.min(10, 34 - visibleCandles)} more candles...</div>
         ) : roundFinished ? (
           <div className="text-cyan-400 font-semibold animate-pulse">
             Round {currentRound} complete! {currentRound < 5 ? "Move to next round →" : "Championship complete!"}
