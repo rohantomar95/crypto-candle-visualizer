@@ -22,6 +22,7 @@ const CandleChart: React.FC = () => {
   const [visibleCandles, setVisibleCandles] = useState(24);
   const [animatingCandle, setAnimatingCandle] = useState<number | null>(null);
   const [showTradePlaced, setShowTradePlaced] = useState(false);
+  const [roundFinished, setRoundFinished] = useState(false); 
   const animationRef = useRef<number | null>(null);
   
   // Generate data for different rounds
@@ -35,14 +36,6 @@ const CandleChart: React.FC = () => {
       5: 1.2,  // XRP price
     };
     
-    const cryptoNames = {
-      1: "ETH/USD",
-      2: "BTC/USD",
-      3: "SOL/USD",
-      4: "BNB/USD",
-      5: "XRP/USD",
-    };
-    
     // Clear animations when changing rounds
     if (animationRef.current) {
       cancelAnimationFrame(animationRef.current);
@@ -52,16 +45,23 @@ const CandleChart: React.FC = () => {
     setShowTradePlaced(false);
     setVisibleCandles(24);
     setAnimatingCandle(null);
+    setRoundFinished(false);
     
     // Generate new data for this round
     const data = generateCandleData(50, startingPrices[currentRound as keyof typeof startingPrices]);
     setCandleData(data);
     
     // Start animating the final candle after a delay
-    setTimeout(() => {
+    const timer = setTimeout(() => {
       setAnimatingCandle(23);
     }, 1000);
     
+    return () => {
+      clearTimeout(timer);
+      if (animationRef.current) {
+        cancelAnimationFrame(animationRef.current);
+      }
+    };
   }, [currentRound]);
 
   useEffect(() => {
@@ -104,6 +104,12 @@ const CandleChart: React.FC = () => {
           if (progress === 1) {
             target.animationComplete = true;
             
+            // Continue animation until complete
+            if (animationRef.current) {
+              cancelAnimationFrame(animationRef.current);
+              animationRef.current = null;
+            }
+            
             // Show "Trade Placed" annotation after candle completes
             setTimeout(() => {
               setShowTradePlaced(true);
@@ -111,22 +117,14 @@ const CandleChart: React.FC = () => {
             
             // Start showing remaining candles after a delay
             setTimeout(() => {
-              let currentVisible = 24;
-              const interval = setInterval(() => {
-                if (currentVisible < candleData.length) {
-                  currentVisible++;
-                  setVisibleCandles(currentVisible);
-                } else {
-                  clearInterval(interval);
-                }
-              }, 800);
+              revealRemainingCandles();
             }, 1500);
           }
           
           return updated;
         });
         
-        // Continue animation until complete
+        // Continue animation if not complete
         if (progress < 1) {
           animationRef.current = requestAnimationFrame(animate);
         }
@@ -141,7 +139,21 @@ const CandleChart: React.FC = () => {
         }
       };
     }
-  }, [animatingCandle, candleData]);
+  }, [animatingCandle, candleData.length]); // Only depend on animatingCandle and candleData.length, not the entire candleData array
+
+  // Separate function to reveal remaining candles
+  const revealRemainingCandles = () => {
+    let currentVisible = 24;
+    const interval = setInterval(() => {
+      if (currentVisible < candleData.length) {
+        currentVisible++;
+        setVisibleCandles(currentVisible);
+      } else {
+        clearInterval(interval);
+        setRoundFinished(true);
+      }
+    }, 800);
+  };
 
   const calculatePriceRange = () => {
     const prices = candleData.slice(0, visibleCandles).flatMap(d => [d.high, d.low]);
@@ -433,9 +445,13 @@ const CandleChart: React.FC = () => {
       
       <div className="mt-4 flex items-center justify-between text-sm text-gray-400">
         <div>Volume: {volumeMax.toLocaleString()}</div>
-        {visibleCandles < candleData.length && (
+        {visibleCandles < candleData.length ? (
           <div>Loading {candleData.length - visibleCandles} more candles...</div>
-        )}
+        ) : roundFinished ? (
+          <div className="text-cyan-400 font-semibold animate-pulse">
+            Round {currentRound} complete! {currentRound < 5 ? "Move to next round →" : "Championship complete!"}
+          </div>
+        ) : null}
       </div>
     </div>
   );
